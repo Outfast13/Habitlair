@@ -18,7 +18,7 @@ import com.app.pomodoro.PomodoroStorage
 import java.time.LocalDate
 import java.util.Locale
 
-private enum class WidgetVariety(val layoutRes: Int, val tag: String) {
+enum class WidgetVariety(val layoutRes: Int, val tag: String) {
     OVERVIEW(R.layout.habitlair_widget, "TODAY"),
     HABITS(R.layout.habitlair_widget_habits, "HABITS"),
     TASKS(R.layout.habitlair_widget_tasks, "TASKS"),
@@ -27,7 +27,7 @@ private enum class WidgetVariety(val layoutRes: Int, val tag: String) {
     SCREEN(R.layout.habitlair_widget_screentime, "SCREEN")
 }
 
-abstract class BaseHabitLairWidgetProvider(private val variety: WidgetVariety) : AppWidgetProvider() {
+abstract class BaseHabitLairWidgetProvider(internal val variety: WidgetVariety) : AppWidgetProvider() {
     override fun onUpdate(
         context: Context,
         appWidgetManager: AppWidgetManager,

@@ -233,7 +233,7 @@ fun AiWorkspaceScreen(
             val result = withContext(Dispatchers.IO) {
                 val goalLine = customGoal.ifBlank { presetAction?.prompt ?: "Audit habits, pending items, and screen time." }
                 val contextSnapshot = "Goal: $goalLine | Screen: ${screenTimeSnapshot.todayMinutes}m/${aiState.dailyScreenLimitMinutes}m (${screenTimeSnapshot.topAppName}) | Pending: ${missedOrPendingToday.take(5).joinToString { it.title }.ifBlank { "None" }}"
-                val systemPrompt = "Direct routine coach. Reply ONLY JSON: {"coach_note":"short blunt note","proposals":[{"title":"...","type":"HABIT|TASK|REMINDER","category":"...","scheduled_time":"HH:mm","evaluation_mode":"YES_NO|NUMERIC|TIMER|CHECKLIST","reason":"..."}]}"
+                val systemPrompt = "Direct routine coach. Reply ONLY JSON: {\"coach_note\":\"short blunt note\",\"proposals\":[{\"title\":\"...\",\"type\":\"HABIT|TASK|REMINDER\",\"category\":\"...\",\"scheduled_time\":\"HH:mm\",\"evaluation_mode\":\"YES_NO|NUMERIC|TIMER|CHECKLIST\",\"reason\":\"...\"}]}"
 
                 val activeKey = if (needsKey) keys.first() else ""
                 val call = executeAiChatCompletion(

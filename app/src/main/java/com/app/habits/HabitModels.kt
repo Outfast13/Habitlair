@@ -5,6 +5,13 @@ import java.time.LocalDate
 
 enum class TrackerItemType { HABIT, TASK, REMINDER }
 
+enum class EvaluationMode(val label: String, val subtitle: String) {
+    YES_NO("Yes or No", "Record whether you succeed with the activity or not"),
+    NUMERIC("Numeric Value", "Establish a value as a daily goal or limit"),
+    TIMER("Timer", "Establish a time value as a daily goal or limit"),
+    CHECKLIST("Checklist", "Evaluate your activity based on a set of sub-items")
+}
+
 enum class ScheduleCadence(val label: String) {
     DAILY("Daily"),
     WEEKLY("Weekly"),
@@ -38,6 +45,12 @@ data class MediaAttachment(
     val sizeBytes: Long
 )
 
+data class ChecklistSubItem(
+    val id: String,
+    val label: String,
+    val checked: Boolean = false
+)
+
 data class CompletionLog(
     val id: String,
     val itemId: String,
@@ -47,7 +60,9 @@ data class CompletionLog(
     val completedAtTime: String,
     val completedAtMillis: Long,
     val proofPhotoPath: String? = null,
-    val note: String = ""
+    val note: String = "",
+    val numericDelta: Double = 0.0,
+    val elapsedSeconds: Int = 0
 )
 
 data class TrackerItem(
@@ -58,7 +73,12 @@ data class TrackerItem(
     val notes: String = "",
     val schedule: ScheduleRule = ScheduleRule(),
     val attachments: List<MediaAttachment> = emptyList(),
-    val streak: Int = 0
+    val streak: Int = 0,
+    val evaluationMode: EvaluationMode = EvaluationMode.YES_NO,
+    val targetValue: Double = 1.0,
+    val targetUnit: String = "count",
+    val targetSeconds: Int = 900,
+    val checklistItems: List<ChecklistSubItem> = emptyList()
 )
 
 data class HabitState(

@@ -12,14 +12,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AudioFile
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.PhotoCamera
-import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.outlined.VideoFile
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -38,8 +30,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import java.util.UUID
 
@@ -171,9 +161,6 @@ fun MediaPickerStrip(
     onError: (String) -> Unit
 ) {
     val context = LocalContext.current
-    var pendingCameraFile by remember { mutableStateOf<File?>(null) }
-    var pendingCameraId by remember { mutableStateOf<String?>(null) }
-
     val picker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -184,169 +171,30 @@ fun MediaPickerStrip(
         }
     }
 
-    val takePictureLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { saved ->
-        val file = pendingCameraFile
-        val id = pendingCameraId ?: UUID.randomUUID().toString()
-        pendingCameraFile = null
-        pendingCameraId = null
-        if (saved && file != null && file.exists() && file.length() > 0L) {
-            onMediaAdded(
-                MediaAttachment(
-                    id = id,
-                    displayName = file.name,
-                    mimeType = "image/jpeg",
-                    localPath = file.absolutePath,
-                    sizeBytes = file.length()
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        listOf(
+            "Photo" to arrayOf("image/*"),
+            "Audio" to arrayOf("audio/*"),
+            "Video" to arrayOf("video/*")
+        ).forEach { (label, mimeFilter) ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .pressScale { picker.launch(mimeFilter) }
+                    .background(LairPalette.SurfaceElevated, RoundedCornerShape(10.dp))
+                    .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(10.dp))
+                    .padding(vertical = 9.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "+ $label",
+                    color = LairPalette.TextPrimary,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
                 )
-            )
-        } else {
-            file?.delete()
-            onError("Camera capture cancelled or empty.")
-        }
-    }
-
-    fun launchCameraCapture() {
-        runCatching {
-            if (!targetDir.exists()) targetDir.mkdirs()
-            val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-            val id = UUID.randomUUID().toString()
-            val photoFile = File(targetDir, "IMG_${stamp}_${id.take(6)}.jpg")
-            val authority = "${context.packageName}.fileprovider"
-            val uri = FileProvider.getUriForFile(context, authority, photoFile)
-            pendingCameraFile = photoFile
-            pendingCameraId = id
-            takePictureLauncher.launch(uri)
-        }.onFailure { err ->
-            onError(err.message ?: "Unable to launch camera.")
-        }
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .pressScale(haptic = true) { launchCameraCapture() }
-                    .background(LairPalette.SurfaceElevated, RoundedCornerShape(10.dp))
-                    .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(10.dp))
-                    .padding(vertical = 9.dp, horizontal = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.PhotoCamera,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = "Camera",
-                        color = LairPalette.TextPrimary,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1
-                    )
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .pressScale { picker.launch(arrayOf("image/*")) }
-                    .background(LairPalette.SurfaceElevated, RoundedCornerShape(10.dp))
-                    .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(10.dp))
-                    .padding(vertical = 9.dp, horizontal = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Image,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = "Photo",
-                        color = LairPalette.TextPrimary,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .pressScale { picker.launch(arrayOf("audio/*")) }
-                    .background(LairPalette.SurfaceElevated, RoundedCornerShape(10.dp))
-                    .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(10.dp))
-                    .padding(vertical = 9.dp, horizontal = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.AudioFile,
-                        contentDescription = null,
-                        tint = LairPalette.AccentCyan,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = "Audio",
-                        color = LairPalette.TextPrimary,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1
-                    )
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .pressScale { picker.launch(arrayOf("video/*")) }
-                    .background(LairPalette.SurfaceElevated, RoundedCornerShape(10.dp))
-                    .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(10.dp))
-                    .padding(vertical = 9.dp, horizontal = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.VideoFile,
-                        contentDescription = null,
-                        tint = LairPalette.AccentViolet,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = "Video",
-                        color = LairPalette.TextPrimary,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1
-                    )
-                }
             }
         }
     }
@@ -398,32 +246,19 @@ fun MediaAttachmentCard(
                 )
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(
                     modifier = Modifier
                         .pressScale { onOpen(att) }
                         .background(primary, RoundedCornerShape(8.dp))
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (isAudioMedia(att) || isVideoMedia(att)) {
-                            Icon(
-                                imageVector = Icons.Outlined.PlayArrow,
-                                contentDescription = null,
-                                tint = onPrimary,
-                                modifier = Modifier.size(15.dp)
-                            )
-                        }
-                        Text(
-                            text = if (isAudioMedia(att) || isVideoMedia(att)) "Play" else "Open",
-                            color = onPrimary,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    Text(
+                        text = if (isAudioMedia(att) || isVideoMedia(att)) "Play" else "Open",
+                        color = onPrimary,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
 
                 if (onRemove != null) {
@@ -433,12 +268,7 @@ fun MediaAttachmentCard(
                             .background(LairPalette.SurfaceCard, RoundedCornerShape(8.dp))
                             .padding(horizontal = 8.dp, vertical = 6.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Close,
-                            contentDescription = "Remove",
-                            tint = LairPalette.DangerRed,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        Text("✕", color = LairPalette.DangerRed, fontWeight = FontWeight.Bold)
                     }
                 }
             }

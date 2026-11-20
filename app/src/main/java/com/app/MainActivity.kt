@@ -16,7 +16,6 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
@@ -26,6 +25,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,10 +39,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.app.ai.AiSettingsStorage
 import com.app.backup.BackupManager
+import com.app.habits.EvaluationMode
 import com.app.habits.HabitStorage
 import com.app.habits.TrackerItem
 import com.app.habits.TrackerItemType
 import com.app.journal.JournalStorage
+import com.app.notifications.ReminderScheduler
+import com.app.notifications.ScreenTimeMonitor
+import com.app.notifications.ScreenTimeSnapshot
 import com.app.pomodoro.PomodoroStorage
 import com.app.ui.AiWorkspaceScreen
 import com.app.ui.AppSettingsScreen
@@ -55,6 +59,7 @@ import com.app.ui.TrackerScreen
 import com.app.widget.HabitLairWidgetProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.util.UUID
 
@@ -95,10 +100,25 @@ class MainActivity : ComponentActivity() {
             var habitsState by remember { mutableStateOf(habitStorage.load()) }
             var journalState by remember { mutableStateOf(journalStorage.load()) }
             var pomodoroState by remember { mutableStateOf(pomodoroStorage.load()) }
+            var screenSnapshot by remember {
+                mutableStateOf(ScreenTimeSnapshot(hasUsagePermission = false, todayMinutes = 0, topAppName = "Checking"))
+            }
 
-            androidx.compose.runtime.LaunchedEffect(Unit) {
-                launch(Dispatchers.IO) {
+            LaunchedEffect(Unit) {
+                withContext(Dispatchers.IO) {
                     backupManager.runAutoBackupIfEnabled()
+                    ReminderScheduler.rescheduleAll(applicationContext, habitsState.items, LocalDate.now())
+                    val snap = ScreenTimeMonitor.queryTodayScreenTime(applicationContext)
+                    withContext(Dispatchers.Main) {
+                        screenSnapshot = snap
+                    }
+                    if (aiState.screenTimeGuardEnabled && snap.hasUsagePermission && snap.todayMinutes >= aiState.dailyScreenLimitMinutes) {
+                        ReminderScheduler.sendScreenTimeWarningNotification(
+                            applicationContext,
+                            snap.todayMinutes,
+                            aiState.dailyScreenLimitMinutes
+                        )
+                    }
                 }
             }
 
@@ -125,12 +145,20 @@ class MainActivity : ComponentActivity() {
             }
 
             fun reloadAllFromStorage() {
-                aiState = aiStorage.load()
-                habitsState = habitStorage.load()
-                journalState = journalStorage.load()
-                pomodoroState = pomodoroStorage.load()
                 scope.launch(Dispatchers.IO) {
+                    val loadedAi = aiStorage.load()
+                    val loadedHabits = habitStorage.load()
+                    val loadedJournal = journalStorage.load()
+                    val loadedPomodoro = pomodoroStorage.load()
+                    val snap = ScreenTimeMonitor.queryTodayScreenTime(applicationContext)
                     HabitLairWidgetProvider.refreshAll(applicationContext)
+                    withContext(Dispatchers.Main) {
+                        aiState = loadedAi
+                        habitsState = loadedHabits
+                        journalState = loadedJournal
+                        pomodoroState = loadedPomodoro
+                        screenSnapshot = snap
+                    }
                 }
             }
 
@@ -204,7 +232,7 @@ class MainActivity : ComponentActivity() {
                         ) {
                             Crossfade(
                                 targetState = destination,
-                                animationSpec = tween(durationMillis = 160),
+                                animationSpec = tween(durationMillis = 120),
                                 label = "mainDestinationCrossfade"
                             ) { target ->
                                 when (target) {
@@ -257,6 +285,9 @@ class MainActivity : ComponentActivity() {
                                             aiState = updated
                                             scope.launch(Dispatchers.IO) {
                                                 aiStorage.save(updated)
+                                                if (updated.notificationsEnabled) {
+                                                    ReminderScheduler.rescheduleAll(applicationContext, habitsState.items, LocalDate.now())
+                                                }
                                             }
                                         },
                                         onBackupRestored = { reloadAllFromStorage() },
@@ -266,15 +297,22 @@ class MainActivity : ComponentActivity() {
 
                                     AppDestination.AI_STUDIO -> AiWorkspaceScreen(
                                         aiState = aiState,
+                                        habitState = habitsState,
+                                        screenTimeSnapshot = screenSnapshot,
                                         onApproveProposedItem = { draft ->
+                                            val mode = runCatching {
+                                                EvaluationMode.valueOf(draft.evaluationMode.uppercase())
+                                            }.getOrDefault(EvaluationMode.YES_NO)
                                             val added = TrackerItem(
                                                 id = UUID.randomUUID().toString(),
                                                 title = draft.title,
                                                 type = draft.type,
                                                 category = draft.category,
-                                                notes = draft.reason
+                                                notes = draft.reason,
+                                                evaluationMode = mode
                                             )
                                             persistHabits(habitsState.copy(items = listOf(added) + habitsState.items))
+                                            ReminderScheduler.scheduleForItem(applicationContext, added, LocalDate.now())
                                         },
                                         onOpenSettings = { destination = AppDestination.SETTINGS },
                                         onOpenDrawer = { scope.launch { drawerState.open() } }

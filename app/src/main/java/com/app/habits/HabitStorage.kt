@@ -54,6 +54,24 @@ class HabitStorage(private val context: Context) {
                     val attArr = obj.optJSONArray("attachments") ?: JSONArray()
                     val attachments = parseMediaList(attArr)
 
+                    val evalMode = runCatching {
+                        EvaluationMode.valueOf(obj.optString("evaluationMode", EvaluationMode.YES_NO.name))
+                    }.getOrDefault(EvaluationMode.YES_NO)
+
+                    val chkArr = obj.optJSONArray("checklistItems") ?: JSONArray()
+                    val checklist = buildList {
+                        for (c in 0 until chkArr.length()) {
+                            val cObj = chkArr.optJSONObject(c) ?: continue
+                            add(
+                                ChecklistSubItem(
+                                    id = cObj.optString("id"),
+                                    label = cObj.optString("label"),
+                                    checked = cObj.optBoolean("checked", false)
+                                )
+                            )
+                        }
+                    }
+
                     add(
                         TrackerItem(
                             id = obj.optString("id"),
@@ -63,7 +81,12 @@ class HabitStorage(private val context: Context) {
                             notes = obj.optString("notes", ""),
                             schedule = schedule,
                             attachments = attachments,
-                            streak = obj.optInt("streak", 0)
+                            streak = obj.optInt("streak", 0),
+                            evaluationMode = evalMode,
+                            targetValue = obj.optDouble("targetValue", 1.0),
+                            targetUnit = obj.optString("targetUnit", "count"),
+                            targetSeconds = obj.optInt("targetSeconds", 900).coerceAtLeast(10),
+                            checklistItems = checklist
                         )
                     )
                 }
@@ -85,7 +108,9 @@ class HabitStorage(private val context: Context) {
                             completedAtTime = lObj.optString("completedAtTime", "12:00"),
                             completedAtMillis = lObj.optLong("completedAtMillis", 0L),
                             proofPhotoPath = lObj.optString("proofPhotoPath", "").ifBlank { null },
-                            note = lObj.optString("note", "")
+                            note = lObj.optString("note", ""),
+                            numericDelta = lObj.optDouble("numericDelta", 0.0),
+                            elapsedSeconds = lObj.optInt("elapsedSeconds", 0)
                         )
                     )
                 }
@@ -111,6 +136,17 @@ class HabitStorage(private val context: Context) {
                 put("scheduledTime", item.schedule.scheduledTime)
                 put("alarmEnabled", item.schedule.alarmEnabled)
             }
+            val chkArr = JSONArray().apply {
+                item.checklistItems.forEach { sub ->
+                    put(
+                        JSONObject().apply {
+                            put("id", sub.id)
+                            put("label", sub.label)
+                            put("checked", sub.checked)
+                        }
+                    )
+                }
+            }
             itemsArr.put(
                 JSONObject().apply {
                     put("id", item.id)
@@ -121,6 +157,11 @@ class HabitStorage(private val context: Context) {
                     put("schedule", schedObj)
                     put("attachments", encodeMediaList(item.attachments))
                     put("streak", item.streak)
+                    put("evaluationMode", item.evaluationMode.name)
+                    put("targetValue", item.targetValue)
+                    put("targetUnit", item.targetUnit)
+                    put("targetSeconds", item.targetSeconds)
+                    put("checklistItems", chkArr)
                 }
             )
         }
@@ -138,6 +179,8 @@ class HabitStorage(private val context: Context) {
                     put("completedAtMillis", log.completedAtMillis)
                     put("proofPhotoPath", log.proofPhotoPath ?: "")
                     put("note", log.note)
+                    put("numericDelta", log.numericDelta)
+                    put("elapsedSeconds", log.elapsedSeconds)
                 }
             )
         }

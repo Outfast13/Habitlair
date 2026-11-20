@@ -30,8 +30,7 @@ fun AppSettingsScreen(
     backupManager: BackupManager,
     onSaveAiState: (AiSettingsState) -> Unit,
     onBackupRestored: () -> Unit,
-    onOpenDrawer: () -> Unit,
-    onOpenAiStudio: () -> Unit = {}
+    onOpenDrawer: () -> Unit
 ) {
     val context = LocalContext.current
     val primary = MaterialTheme.colorScheme.primary
@@ -97,17 +96,6 @@ fun AppSettingsScreen(
             badgeText = themePreset.name.take(6),
             onOpenDrawer = onOpenDrawer
         )
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .pressScale { onOpenAiStudio() }
-                .background(LairPalette.SurfaceCard, RoundedCornerShape(14.dp))
-                .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(14.dp))
-                .padding(horizontal = 14.dp, vertical = 12.dp)
-        ) {
-            Text("Open AI Routine Studio", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
-        }
 
         // 1. Theme & UI Customization
         Column(

@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccessAlarm
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Book
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Menu
@@ -30,7 +29,6 @@ import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.SelfImprovement
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -368,12 +366,4 @@ fun TinyDateWheelBar(
             }
         }
     }
-}
-
-fun tabVectorIcon(tabIndex: Int): ImageVector = when (tabIndex) {
-    0 -> Icons.Outlined.Repeat
-    1 -> Icons.Outlined.CheckCircle
-    2 -> Icons.Outlined.Book
-    3 -> Icons.Outlined.Timer
-    else -> Icons.Outlined.Settings
 }

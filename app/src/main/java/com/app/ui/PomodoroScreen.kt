@@ -21,7 +21,6 @@ import java.util.Locale
 fun PomodoroScreen(
     initialState: PomodoroState,
     onOpenDrawer: () -> Unit,
-    onOpenSettings: () -> Unit,
     onStateChanged: (PomodoroState) -> Unit
 ) {
     val primary = MaterialTheme.colorScheme.primary
@@ -73,8 +72,7 @@ fun PomodoroScreen(
             sectionTitle = "POMODORO",
             sectionSubtitle = "Focus intervals, break blocks & session counter",
             badgeText = "${state.completedFocusCount} blocks",
-            onOpenDrawer = onOpenDrawer,
-            onOpenSettings = onOpenSettings
+            onOpenDrawer = onOpenDrawer
         )
 
         Column(

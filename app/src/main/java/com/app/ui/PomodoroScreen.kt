@@ -21,6 +21,7 @@ import java.util.Locale
 fun PomodoroScreen(
     initialState: PomodoroState,
     onOpenDrawer: () -> Unit,
+    onOpenSettings: () -> Unit = {},
     onStateChanged: (PomodoroState) -> Unit
 ) {
     val primary = MaterialTheme.colorScheme.primary

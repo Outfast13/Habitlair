@@ -37,6 +37,7 @@ fun TrackerScreen(
     initialState: HabitState,
     storage: HabitStorage,
     onOpenDrawer: () -> Unit,
+    onOpenSettings: () -> Unit = {},
     onStateChanged: (HabitState) -> Unit
 ) {
     val context = LocalContext.current
@@ -345,14 +346,14 @@ fun TrackerScreen(
 
             MediaPickerStrip(
                 targetDir = storage.getMediaDirectory(),
-                onMediaAdded = { draftMedia = draftMedia + it },
+                onMediaAdded = { addedMedia: MediaAttachment -> draftMedia = draftMedia + addedMedia },
                 onError = { statusMessage = it }
             )
 
             draftMedia.forEach { att ->
                 MediaAttachmentCard(
                     att = att,
-                    onOpen = { openMediaAttachmentIntent(context, it) { err -> statusMessage = err } },
+                    onOpen = { targetAtt: MediaAttachment -> openMediaAttachmentIntent(context, targetAtt) { err: String -> statusMessage = err } },
                     onRemove = {
                         File(att.localPath).delete()
                         draftMedia = draftMedia.filterNot { m -> m.id == att.id }
@@ -668,7 +669,7 @@ fun TrackerScreen(
                     item.attachments.forEach { att ->
                         MediaAttachmentCard(
                             att = att,
-                            onOpen = { openMediaAttachmentIntent(context, it) { err -> statusMessage = err } }
+                            onOpen = { targetAtt: MediaAttachment -> openMediaAttachmentIntent(context, targetAtt) { err: String -> statusMessage = err } }
                         )
                     }
                 }

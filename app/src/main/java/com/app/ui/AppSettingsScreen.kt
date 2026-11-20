@@ -30,7 +30,8 @@ fun AppSettingsScreen(
     backupManager: BackupManager,
     onSaveAiState: (AiSettingsState) -> Unit,
     onBackupRestored: () -> Unit,
-    onOpenDrawer: () -> Unit
+    onOpenDrawer: () -> Unit,
+    onOpenAiStudio: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val primary = MaterialTheme.colorScheme.primary

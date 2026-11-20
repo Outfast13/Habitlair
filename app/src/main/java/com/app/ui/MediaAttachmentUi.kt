@@ -41,6 +41,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.app.habits.MediaAttachment
@@ -86,29 +87,45 @@ fun importUriToDirectory(context: Context, uri: Uri, targetDir: File): Result<Me
     }
 }
 
-fun openMediaAttachmentIntent(context: Context, attachment: MediaAttachment) {
+fun openMediaAttachmentIntent(
+    context: Context,
+    attachment: MediaAttachment,
+    onError: (String) -> Unit = {}
+) {
     runCatching {
         val file = File(attachment.localPath)
-        if (!file.exists()) return
+        if (!file.exists()) {
+            onError("Attachment file not found.")
+            return
+        }
         val authority = "${context.packageName}.fileprovider"
         val contentUri = FileProvider.getUriForFile(context, authority, file)
         val viewIntent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(contentUri, attachment.mimeType.ifBlank { "*/*" })
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(Intent.createChooser(viewIntent, "Open ${attachment.displayName}").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(
+            Intent.createChooser(viewIntent, "Open ${attachment.displayName}")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }.onFailure { err ->
+        onError(err.message ?: "Unable to open attachment.")
     }
 }
 
 @Composable
 fun InlineMediaImage(
-    path: String,
+    path: String? = null,
+    localPath: String? = null,
+    heightDp: Int = 150,
     contentDescription: String? = null,
     modifier: Modifier = Modifier
 ) {
-    val bitmap = remember(path) {
+    val resolvedPath = path ?: localPath ?: return
+    val heightVal: Dp = heightDp.dp
+    val bitmap = remember(resolvedPath) {
         runCatching {
-            val file = File(path)
+            val file = File(resolvedPath)
             if (file.exists()) BitmapFactory.decodeFile(file.absolutePath) else null
         }.getOrNull()
     }
@@ -119,7 +136,7 @@ fun InlineMediaImage(
             contentScale = ContentScale.Crop,
             modifier = modifier
                 .fillMaxWidth()
-                .height(150.dp)
+                .height(heightVal)
                 .clip(RoundedCornerShape(10.dp))
         )
     }
@@ -127,27 +144,29 @@ fun InlineMediaImage(
 
 @Composable
 fun MediaAttachmentCard(
-    attachment: MediaAttachment,
+    attachment: MediaAttachment? = null,
+    att: MediaAttachment? = null,
     onOpen: (MediaAttachment) -> Unit = {},
     onRemove: ((MediaAttachment) -> Unit)? = null
 ) {
+    val target = attachment ?: att ?: return
     val icon = when {
-        attachment.mimeType.startsWith("image/") -> Icons.Outlined.Image
-        attachment.mimeType.startsWith("video/") -> Icons.Outlined.Videocam
-        attachment.mimeType.startsWith("audio/") -> Icons.Outlined.Audiotrack
+        target.mimeType.startsWith("image/") -> Icons.Outlined.Image
+        target.mimeType.startsWith("video/") -> Icons.Outlined.Videocam
+        target.mimeType.startsWith("audio/") -> Icons.Outlined.Audiotrack
         else -> Icons.Outlined.AttachFile
     }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .pressScale { onOpen(attachment) }
+            .pressScale { onOpen(target) }
             .background(LairPalette.SurfaceElevated, RoundedCornerShape(10.dp))
             .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(10.dp))
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        if (attachment.mimeType.startsWith("image/")) {
-            InlineMediaImage(path = attachment.localPath, contentDescription = attachment.displayName)
+        if (target.mimeType.startsWith("image/")) {
+            InlineMediaImage(path = target.localPath, contentDescription = target.displayName)
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -157,7 +176,7 @@ fun MediaAttachmentCard(
             Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = attachment.displayName,
+                    text = target.displayName,
                     color = LairPalette.TextPrimary,
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Bold,
@@ -165,14 +184,14 @@ fun MediaAttachmentCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "${attachment.mimeType} • ${(attachment.sizeBytes / 1024L).coerceAtLeast(1L)} KB",
+                    text = "${target.mimeType} • ${(target.sizeBytes / 1024L).coerceAtLeast(1L)} KB",
                     color = LairPalette.TextSecondary,
                     style = MaterialTheme.typography.labelSmall
                 )
             }
             Icon(Icons.Outlined.OpenInNew, contentDescription = "Open", tint = LairPalette.TextSecondary, modifier = Modifier.size(16.dp))
             if (onRemove != null) {
-                Box(modifier = Modifier.pressScale { onRemove(attachment) }) {
+                Box(modifier = Modifier.pressScale { onRemove(target) }) {
                     Icon(Icons.Outlined.Close, contentDescription = "Remove", tint = LairPalette.TextSecondary, modifier = Modifier.size(16.dp))
                 }
             }
@@ -183,24 +202,31 @@ fun MediaAttachmentCard(
 @Composable
 fun MediaPickerActionRow(
     targetDir: File,
-    onMediaAdded: (MediaAttachment) -> Unit
+    onMediaAdded: (MediaAttachment) -> Unit,
+    onError: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val primary = MaterialTheme.colorScheme.primary
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
-            importUriToDirectory(context, uri, targetDir).getOrNull()?.let(onMediaAdded)
+            importUriToDirectory(context, uri, targetDir)
+                .onSuccess(onMediaAdded)
+                .onFailure { err -> onError(err.message ?: "Failed to attach photo.") }
         }
     }
     val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
-            importUriToDirectory(context, uri, targetDir).getOrNull()?.let(onMediaAdded)
+            importUriToDirectory(context, uri, targetDir)
+                .onSuccess(onMediaAdded)
+                .onFailure { err -> onError(err.message ?: "Failed to attach video.") }
         }
     }
     val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
-            importUriToDirectory(context, uri, targetDir).getOrNull()?.let(onMediaAdded)
+            importUriToDirectory(context, uri, targetDir)
+                .onSuccess(onMediaAdded)
+                .onFailure { err -> onError(err.message ?: "Failed to attach audio.") }
         }
     }
 
@@ -266,12 +292,21 @@ fun MediaPickerActionRow(
 @Composable
 fun MediaPickerStrip(
     targetDir: File,
-    attachments: List<MediaAttachment>,
-    onAdd: (MediaAttachment) -> Unit,
-    onRemove: (MediaAttachment) -> Unit
+    attachments: List<MediaAttachment> = emptyList(),
+    onAdd: (MediaAttachment) -> Unit = {},
+    onRemove: (MediaAttachment) -> Unit = {},
+    onMediaAdded: ((MediaAttachment) -> Unit)? = null,
+    onError: (String) -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        MediaPickerActionRow(targetDir = targetDir, onMediaAdded = onAdd)
+        MediaPickerActionRow(
+            targetDir = targetDir,
+            onMediaAdded = { added ->
+                onAdd(added)
+                onMediaAdded?.invoke(added)
+            },
+            onError = onError
+        )
         if (attachments.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 attachments.forEach { att ->

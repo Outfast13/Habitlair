@@ -94,7 +94,8 @@ fun AppSettingsScreen(
             sectionTitle = "SETTINGS",
             sectionSubtitle = "Theme, UI, AI, notifications, alarms & backups",
             badgeText = themePreset.name.take(6),
-            onOpenDrawer = onOpenDrawer
+            onOpenDrawer = onOpenDrawer,
+            onOpenSettings = {}
         )
 
         // 1. Theme & UI Customization

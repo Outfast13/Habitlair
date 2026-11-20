@@ -72,7 +72,8 @@ fun PomodoroScreen(
             sectionTitle = "POMODORO",
             sectionSubtitle = "Focus intervals, break blocks & session counter",
             badgeText = "${state.completedFocusCount} blocks",
-            onOpenDrawer = onOpenDrawer
+            onOpenDrawer = onOpenDrawer,
+            onOpenSettings = onOpenSettings
         )
 
         Column(

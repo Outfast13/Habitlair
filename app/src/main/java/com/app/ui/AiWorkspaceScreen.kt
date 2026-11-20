@@ -110,8 +110,7 @@ fun AiWorkspaceScreen(
         val summary = if (alerts.isEmpty()) {
             "Routine looks steady. Give AI a goal or missed item below to build tailored habits, tasks, or reminders."
         } else {
-            alerts.joinToString("
-• ", prefix = "• ")
+            alerts.joinToString("\n• ", prefix = "• ")
         }
 
         val generatedProposals = buildList {

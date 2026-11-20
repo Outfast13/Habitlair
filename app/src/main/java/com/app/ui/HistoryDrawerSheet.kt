@@ -2,141 +2,134 @@ package com.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.app.habits.HabitState
-import com.app.habits.TrackerItemType
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun HistoryDrawerContent(
     habitState: HabitState,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenAi: () -> Unit
 ) {
     val primary = MaterialTheme.colorScheme.primary
-    val secondary = MaterialTheme.colorScheme.secondary
-
-    val habitCount = habitState.items.count { it.type == TrackerItemType.HABIT }
-    val taskCount = habitState.items.count { it.type == TrackerItemType.TASK }
-    val reminderCount = habitState.items.count { it.type == TrackerItemType.REMINDER }
-    val bestStreak = habitState.items.maxOfOrNull { it.streak } ?: 0
+    val recentLogs = remember(habitState.logs) {
+        habitState.logs.sortedByDescending { it.completedAtMillis }.take(10)
+    }
 
     Column(
         modifier = Modifier
+            .width(308.dp)
             .fillMaxHeight()
-            .widthIn(min = 270.dp, max = 330.dp)
             .background(LairPalette.SurfaceCard)
-            .border(1.dp, LairPalette.BorderSubtle)
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "HABITLAIR LOGS",
-                color = primary,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Box(
-                modifier = Modifier
-                    .pressScale { onClose() }
-                    .background(LairPalette.SurfaceElevated, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text("✕", color = LairPalette.TextPrimary, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.History, contentDescription = null, tint = primary)
+                Text("HabitLair", color = LairPalette.TextPrimary, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            }
+            Box(modifier = Modifier.pressScale(onClose)) {
+                Icon(Icons.Outlined.Close, contentDescription = "Close drawer", tint = LairPalette.TextSecondary)
             }
         }
 
-        // Streaks & Totals summary
-        Column(
+        HorizontalDivider(color = DividerDefaults.color)
+
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(LairPalette.SurfaceElevated, RoundedCornerShape(12.dp))
-                .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(12.dp))
+                .pressScale(onOpenAi)
+                .background(LairPalette.SurfaceElevated, RoundedCornerShape(10.dp))
+                .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(10.dp))
                 .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Streaks & Totals", color = secondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
-            Text("Best Streak: ${bestStreak}d", color = LairPalette.TextPrimary, fontWeight = FontWeight.SemiBold)
-            Text("Total Logs: ${habitState.logs.size}", color = LairPalette.TextSecondary, style = MaterialTheme.typography.bodySmall)
-            Text("Habits: $habitCount • Tasks: $taskCount • Reminders: $reminderCount", color = LairPalette.TextSecondary, style = MaterialTheme.typography.bodySmall)
+            Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = primary)
+            Text("AI Coach & Overuse Guard", color = LairPalette.TextPrimary, fontWeight = FontWeight.Bold)
         }
 
-        // Active Streaks list
-        Text("Active Streaks", color = LairPalette.TextPrimary, fontWeight = FontWeight.Bold)
-        if (habitState.items.isEmpty()) {
-            Text("No tracked items yet.", color = LairPalette.TextSecondary, style = MaterialTheme.typography.bodySmall)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .pressScale(onOpenSettings)
+                .background(LairPalette.SurfaceElevated, RoundedCornerShape(10.dp))
+                .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(10.dp))
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Outlined.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+            Text("Settings & Backups", color = LairPalette.TextPrimary, fontWeight = FontWeight.Bold)
+        }
+
+        Text("Completion History", color = LairPalette.TextSecondary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+
+        if (recentLogs.isEmpty()) {
+            Text("No completion logs recorded yet.", color = LairPalette.TextSecondary, style = MaterialTheme.typography.bodySmall)
         } else {
-            habitState.items.forEach { item ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(LairPalette.SurfaceElevated, RoundedCornerShape(10.dp))
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "${item.title} (${item.type.name.lowercase()})",
-                        color = LairPalette.TextPrimary,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = "${item.streak}d",
-                        color = primary,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+            recentLogs.forEach { log ->
+                val dayLabel = remember(log.dateEpochDay) {
+                    LocalDate.ofEpochDay(log.dateEpochDay)
+                        .format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US))
                 }
-            }
-        }
-
-        // Completion & Logging History
-        Text("Completion History", color = LairPalette.TextPrimary, fontWeight = FontWeight.Bold)
-        if (habitState.logs.isEmpty()) {
-            Text("No completed items logged yet.", color = LairPalette.TextSecondary, style = MaterialTheme.typography.bodySmall)
-        } else {
-            habitState.logs.take(30).forEach { log ->
-                val dateStr = LocalDate.ofEpochDay(log.dateEpochDay).toString()
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(LairPalette.SurfaceElevated, RoundedCornerShape(10.dp))
                         .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(10.dp))
                         .padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(
-                        text = "${log.itemTitle} • ${log.itemType.name}",
-                        color = LairPalette.TextPrimary,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "$dateStr @ ${log.completedAtTime}",
-                        color = primary,
-                        style = MaterialTheme.typography.labelSmall
-                    )
+                    Text(log.itemTitle, color = LairPalette.TextPrimary, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    Text("$dayLabel • ${log.completedAtTime}", color = LairPalette.TextSecondary, style = MaterialTheme.typography.labelSmall)
                     if (log.note.isNotBlank()) {
                         Text(log.note, color = LairPalette.TextSecondary, style = MaterialTheme.typography.bodySmall)
                     }
-                    if (log.proofPhotoPath != null) {
-                        InlineMediaImage(localPath = log.proofPhotoPath, heightDp = 95)
+                    val proof = log.proofPhotoPath
+                    if (!proof.isNullOrBlank()) {
+                        InlineMediaImage(path = proof, contentDescription = "Proof")
                     }
                 }
             }
         }
+        Spacer(modifier = Modifier.weight(1f))
     }
 }

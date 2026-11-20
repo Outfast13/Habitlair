@@ -41,12 +41,7 @@ object ReminderScheduler {
         val hour = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: 8
         val minute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: 0
 
-        var targetDate = referenceDate
-        var triggerMillis = targetDate.atTime(hour, minute)
-            .atZone(ZoneId.systemDefault())
-            .toInstant()
-            .toEpochMilli()
-
+        var triggerMillis = 0L
         val now = System.currentTimeMillis()
         for (offset in 0..366) {
             val candidateDate = referenceDate.plusDays(offset.toLong())
@@ -56,7 +51,6 @@ object ReminderScheduler {
                 .toInstant()
                 .toEpochMilli()
             if (candidateMillis > now) {
-                targetDate = candidateDate
                 triggerMillis = candidateMillis
                 break
             }
@@ -91,6 +85,34 @@ object ReminderScheduler {
 
     fun rescheduleAll(context: Context, items: List<TrackerItem>, referenceDate: LocalDate = LocalDate.now()) {
         items.forEach { scheduleForItem(context, it, referenceDate) }
+    }
+
+    fun triggerImmediateTestNotification(
+        context: Context,
+        isAlarm: Boolean = false,
+        title: String = if (isAlarm) "HabitLair Test Alarm" else "HabitLair Test Alert",
+        body: String = if (isAlarm) "Exact alarm trigger is active." else "Notification delivery is active."
+    ) {
+        ensureChannel(context)
+        val mgr = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        val launchIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pi = PendingIntent.getActivity(
+            context,
+            99002,
+            launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notif = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pi)
+            .setAutoCancel(true)
+            .build()
+        mgr.notify(99002, notif)
     }
 
     fun sendScreenTimeWarningNotification(context: Context, usedMinutes: Int, limitMinutes: Int) {

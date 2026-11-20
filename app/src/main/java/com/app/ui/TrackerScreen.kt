@@ -106,12 +106,7 @@ fun TrackerScreen(
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        HabitLairTopBar(
-            sectionTitle = sectionMeta.first,
-            sectionSubtitle = sectionMeta.second,
-            badgeText = "${completedItemIdsOnDate.count { id -> matchingItems.any { it.id == id } }}/${matchingItems.size} done",
-            onOpenDrawer = onOpenDrawer
-        )
+        HabitLairTopBar(sectionTitle = sectionMeta.first, sectionSubtitle = sectionMeta.second, badgeText = "${completedItemIdsOnDate.count { id -> matchingItems.any { it.id == id } }}/${matchingItems.size} done", onOpenDrawer = onOpenDrawer, onOpenSettings = onOpenSettings)
 
         if (settings.showDateWheel) {
             TinyDateWheelBar(

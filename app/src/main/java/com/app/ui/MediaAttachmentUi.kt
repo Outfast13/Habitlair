@@ -1,10 +1,13 @@
 package com.app.ui
 
 import android.content.Context
+import android.content.Intent
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
@@ -22,23 +26,29 @@ import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Audiotrack
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import com.app.habits.MediaAttachment
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 
-private fun importUriIntoDir(context: Context, uri: Uri, targetDir: File): MediaAttachment? {
+fun importUriToDirectory(context: Context, uri: Uri, targetDir: File): Result<MediaAttachment> {
     return runCatching {
         if (!targetDir.exists()) targetDir.mkdirs()
         val resolver = context.contentResolver
@@ -64,7 +74,7 @@ private fun importUriIntoDir(context: Context, uri: Uri, targetDir: File): Media
             FileOutputStream(destFile).use { output ->
                 input.copyTo(output)
             }
-        } ?: return null
+        } ?: error("Unable to read selected file.")
         if (size <= 0L) size = destFile.length()
         MediaAttachment(
             id = UUID.randomUUID().toString(),
@@ -73,7 +83,101 @@ private fun importUriIntoDir(context: Context, uri: Uri, targetDir: File): Media
             localPath = destFile.absolutePath,
             sizeBytes = size
         )
-    }.getOrNull()
+    }
+}
+
+fun openMediaAttachmentIntent(context: Context, attachment: MediaAttachment) {
+    runCatching {
+        val file = File(attachment.localPath)
+        if (!file.exists()) return
+        val authority = "${context.packageName}.fileprovider"
+        val contentUri = FileProvider.getUriForFile(context, authority, file)
+        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(contentUri, attachment.mimeType.ifBlank { "*/*" })
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(Intent.createChooser(viewIntent, "Open ${attachment.displayName}").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+}
+
+@Composable
+fun InlineMediaImage(
+    path: String,
+    contentDescription: String? = null,
+    modifier: Modifier = Modifier
+) {
+    val bitmap = remember(path) {
+        runCatching {
+            val file = File(path)
+            if (file.exists()) BitmapFactory.decodeFile(file.absolutePath) else null
+        }.getOrNull()
+    }
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+                .fillMaxWidth()
+                .height(150.dp)
+                .clip(RoundedCornerShape(10.dp))
+        )
+    }
+}
+
+@Composable
+fun MediaAttachmentCard(
+    attachment: MediaAttachment,
+    onOpen: (MediaAttachment) -> Unit = {},
+    onRemove: ((MediaAttachment) -> Unit)? = null
+) {
+    val icon = when {
+        attachment.mimeType.startsWith("image/") -> Icons.Outlined.Image
+        attachment.mimeType.startsWith("video/") -> Icons.Outlined.Videocam
+        attachment.mimeType.startsWith("audio/") -> Icons.Outlined.Audiotrack
+        else -> Icons.Outlined.AttachFile
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pressScale { onOpen(attachment) }
+            .background(LairPalette.SurfaceElevated, RoundedCornerShape(10.dp))
+            .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(10.dp))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        if (attachment.mimeType.startsWith("image/")) {
+            InlineMediaImage(path = attachment.localPath, contentDescription = attachment.displayName)
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = attachment.displayName,
+                    color = LairPalette.TextPrimary,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${attachment.mimeType} • ${(attachment.sizeBytes / 1024L).coerceAtLeast(1L)} KB",
+                    color = LairPalette.TextSecondary,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+            Icon(Icons.Outlined.OpenInNew, contentDescription = "Open", tint = LairPalette.TextSecondary, modifier = Modifier.size(16.dp))
+            if (onRemove != null) {
+                Box(modifier = Modifier.pressScale { onRemove(attachment) }) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Remove", tint = LairPalette.TextSecondary, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -86,17 +190,17 @@ fun MediaPickerActionRow(
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
-            importUriIntoDir(context, uri, targetDir)?.let(onMediaAdded)
+            importUriToDirectory(context, uri, targetDir).getOrNull()?.let(onMediaAdded)
         }
     }
     val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
-            importUriIntoDir(context, uri, targetDir)?.let(onMediaAdded)
+            importUriToDirectory(context, uri, targetDir).getOrNull()?.let(onMediaAdded)
         }
     }
     val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
-            importUriIntoDir(context, uri, targetDir)?.let(onMediaAdded)
+            importUriToDirectory(context, uri, targetDir).getOrNull()?.let(onMediaAdded)
         }
     }
 
@@ -153,6 +257,28 @@ fun MediaPickerActionRow(
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Audiotrack, contentDescription = null, tint = LairPalette.MintSuccess, modifier = Modifier.size(16.dp))
                     Text("Audio", color = LairPalette.TextPrimary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MediaPickerStrip(
+    targetDir: File,
+    attachments: List<MediaAttachment>,
+    onAdd: (MediaAttachment) -> Unit,
+    onRemove: (MediaAttachment) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        MediaPickerActionRow(targetDir = targetDir, onMediaAdded = onAdd)
+        if (attachments.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                attachments.forEach { att ->
+                    MediaAttachmentCard(
+                        attachment = att,
+                        onRemove = onRemove
+                    )
                 }
             }
         }

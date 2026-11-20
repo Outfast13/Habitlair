@@ -9,7 +9,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Book
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Repeat
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBar
@@ -24,7 +32,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import com.app.ai.AiSettingsStorage
 import com.app.backup.BackupManager
 import com.app.habits.HabitStorage
@@ -41,19 +53,26 @@ import com.app.ui.LairPalette
 import com.app.ui.PomodoroScreen
 import com.app.ui.TrackerScreen
 import com.app.widget.HabitLairWidgetProvider
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.util.UUID
 
-private enum class AppTab(val label: String, val icon: String) {
-    HABITS("Habits", "↻"),
-    TASKS("Tasks", "✓"),
-    REMINDERS("Remind", "⏰"),
-    JOURNAL("Journal", "✎"),
-    POMODORO("Timer", "⏱"),
-    AI("AI", "✦"),
-    SETTINGS("Config", "⚙")
+private enum class AppDestination(val label: String, val icon: ImageVector) {
+    HABITS("Habits", Icons.Outlined.Repeat),
+    TASKS("Tasks", Icons.Outlined.CheckCircle),
+    JOURNAL("Journal", Icons.Outlined.Book),
+    TIMER("Timer", Icons.Outlined.Timer),
+    SETTINGS("Settings", Icons.Outlined.Timer),
+    AI_STUDIO("AI Studio", Icons.Outlined.Timer)
 }
+
+private val PRIMARY_NAV_TABS = listOf(
+    AppDestination.HABITS,
+    AppDestination.TASKS,
+    AppDestination.JOURNAL,
+    AppDestination.TIMER
+)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,25 +83,55 @@ class MainActivity : ComponentActivity() {
         val journalStorage = JournalStorage(applicationContext)
         val pomodoroStorage = PomodoroStorage(applicationContext)
         val backupManager = BackupManager(applicationContext)
-        backupManager.runAutoBackupIfEnabled()
 
         setContent {
             val scope = rememberCoroutineScope()
+            val haptics = LocalHapticFeedback.current
             val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
-            var currentTab by remember { mutableStateOf(AppTab.HABITS) }
+            var destination by remember { mutableStateOf(AppDestination.HABITS) }
             var selectedDate by remember { mutableStateOf(LocalDate.now()) }
             var aiState by remember { mutableStateOf(aiStorage.load()) }
             var habitsState by remember { mutableStateOf(habitStorage.load()) }
             var journalState by remember { mutableStateOf(journalStorage.load()) }
             var pomodoroState by remember { mutableStateOf(pomodoroStorage.load()) }
 
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                launch(Dispatchers.IO) {
+                    backupManager.runAutoBackupIfEnabled()
+                }
+            }
+
+            fun persistHabits(updated: com.app.habits.HabitState) {
+                habitsState = updated
+                scope.launch(Dispatchers.IO) {
+                    habitStorage.save(updated)
+                    HabitLairWidgetProvider.refreshAll(applicationContext)
+                }
+            }
+
+            fun persistJournal(updated: com.app.journal.JournalState) {
+                journalState = updated
+                scope.launch(Dispatchers.IO) {
+                    journalStorage.save(updated)
+                }
+            }
+
+            fun persistPomodoro(updated: com.app.pomodoro.PomodoroState) {
+                pomodoroState = updated
+                scope.launch(Dispatchers.IO) {
+                    pomodoroStorage.save(updated)
+                }
+            }
+
             fun reloadAllFromStorage() {
                 aiState = aiStorage.load()
                 habitsState = habitStorage.load()
                 journalState = journalStorage.load()
                 pomodoroState = pomodoroStorage.load()
-                HabitLairWidgetProvider.refreshAll(applicationContext)
+                scope.launch(Dispatchers.IO) {
+                    HabitLairWidgetProvider.refreshAll(applicationContext)
+                }
             }
 
             HabitLairTheme(settings = aiState) {
@@ -94,19 +143,33 @@ class MainActivity : ComponentActivity() {
                     drawerContent = {
                         HistoryDrawerContent(
                             habitState = habitsState,
-                            onClose = { scope.launch { drawerState.close() } }
+                            onClose = { scope.launch { drawerState.close() } },
+                            onOpenSettings = {
+                                scope.launch { drawerState.close() }
+                                destination = AppDestination.SETTINGS
+                            },
+                            onOpenAi = {
+                                scope.launch { drawerState.close() }
+                                destination = AppDestination.AI_STUDIO
+                            }
                         )
                     }
                 ) {
                     Scaffold(
                         containerColor = LairPalette.Canvas,
                         bottomBar = {
-                            NavigationBar(containerColor = LairPalette.SurfaceCard) {
-                                AppTab.entries.forEach { tab ->
-                                    val selected = currentTab == tab
+                            NavigationBar(
+                                containerColor = LairPalette.SurfaceCard,
+                                tonalElevation = 0.dp
+                            ) {
+                                PRIMARY_NAV_TABS.forEach { tab ->
+                                    val selected = destination == tab
                                     NavigationBarItem(
                                         selected = selected,
-                                        onClick = { currentTab = tab },
+                                        onClick = {
+                                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            destination = tab
+                                        },
                                         label = {
                                             Text(
                                                 text = tab.label,
@@ -114,7 +177,13 @@ class MainActivity : ComponentActivity() {
                                                 maxLines = 1
                                             )
                                         },
-                                        icon = { Text(tab.icon) },
+                                        icon = {
+                                            Icon(
+                                                imageVector = tab.icon,
+                                                contentDescription = tab.label,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        },
                                         colors = NavigationBarItemDefaults.colors(
                                             selectedIconColor = onPrimary,
                                             selectedTextColor = primary,
@@ -134,12 +203,12 @@ class MainActivity : ComponentActivity() {
                                 .background(LairPalette.Canvas)
                         ) {
                             Crossfade(
-                                targetState = currentTab,
-                                animationSpec = tween(180),
-                                label = "mainTabCrossfade"
+                                targetState = destination,
+                                animationSpec = tween(durationMillis = 160),
+                                label = "mainDestinationCrossfade"
                             ) { target ->
                                 when (target) {
-                                    AppTab.HABITS -> TrackerScreen(
+                                    AppDestination.HABITS -> TrackerScreen(
                                         fixedType = TrackerItemType.HABIT,
                                         selectedDate = selectedDate,
                                         onSelectDate = { selectedDate = it },
@@ -147,14 +216,11 @@ class MainActivity : ComponentActivity() {
                                         initialState = habitsState,
                                         storage = habitStorage,
                                         onOpenDrawer = { scope.launch { drawerState.open() } },
-                                        onStateChanged = { updated ->
-                                            habitsState = updated
-                                            habitStorage.save(updated)
-                                            HabitLairWidgetProvider.refreshAll(applicationContext)
-                                        }
+                                        onOpenSettings = { destination = AppDestination.SETTINGS },
+                                        onStateChanged = { persistHabits(it) }
                                     )
 
-                                    AppTab.TASKS -> TrackerScreen(
+                                    AppDestination.TASKS -> TrackerScreen(
                                         fixedType = TrackerItemType.TASK,
                                         selectedDate = selectedDate,
                                         onSelectDate = { selectedDate = it },
@@ -162,51 +228,43 @@ class MainActivity : ComponentActivity() {
                                         initialState = habitsState,
                                         storage = habitStorage,
                                         onOpenDrawer = { scope.launch { drawerState.open() } },
-                                        onStateChanged = { updated ->
-                                            habitsState = updated
-                                            habitStorage.save(updated)
-                                            HabitLairWidgetProvider.refreshAll(applicationContext)
-                                        }
+                                        onOpenSettings = { destination = AppDestination.SETTINGS },
+                                        onStateChanged = { persistHabits(it) }
                                     )
 
-                                    AppTab.REMINDERS -> TrackerScreen(
-                                        fixedType = TrackerItemType.REMINDER,
-                                        selectedDate = selectedDate,
-                                        onSelectDate = { selectedDate = it },
-                                        settings = aiState,
-                                        initialState = habitsState,
-                                        storage = habitStorage,
-                                        onOpenDrawer = { scope.launch { drawerState.open() } },
-                                        onStateChanged = { updated ->
-                                            habitsState = updated
-                                            habitStorage.save(updated)
-                                            HabitLairWidgetProvider.refreshAll(applicationContext)
-                                        }
-                                    )
-
-                                    AppTab.JOURNAL -> JournalScreen(
+                                    AppDestination.JOURNAL -> JournalScreen(
                                         selectedDate = selectedDate,
                                         onSelectDate = { selectedDate = it },
                                         settings = aiState,
                                         initialState = journalState,
                                         storage = journalStorage,
                                         onOpenDrawer = { scope.launch { drawerState.open() } },
-                                        onStateChanged = { updated ->
-                                            journalState = updated
-                                            journalStorage.save(updated)
-                                        }
+                                        onOpenSettings = { destination = AppDestination.SETTINGS },
+                                        onStateChanged = { persistJournal(it) }
                                     )
 
-                                    AppTab.POMODORO -> PomodoroScreen(
+                                    AppDestination.TIMER -> PomodoroScreen(
                                         initialState = pomodoroState,
                                         onOpenDrawer = { scope.launch { drawerState.open() } },
-                                        onStateChanged = { updated ->
-                                            pomodoroState = updated
-                                            pomodoroStorage.save(updated)
-                                        }
+                                        onOpenSettings = { destination = AppDestination.SETTINGS },
+                                        onStateChanged = { persistPomodoro(it) }
                                     )
 
-                                    AppTab.AI -> AiWorkspaceScreen(
+                                    AppDestination.SETTINGS -> AppSettingsScreen(
+                                        aiState = aiState,
+                                        backupManager = backupManager,
+                                        onSaveAiState = { updated ->
+                                            aiState = updated
+                                            scope.launch(Dispatchers.IO) {
+                                                aiStorage.save(updated)
+                                            }
+                                        },
+                                        onBackupRestored = { reloadAllFromStorage() },
+                                        onOpenDrawer = { scope.launch { drawerState.open() } },
+                                        onOpenAiStudio = { destination = AppDestination.AI_STUDIO }
+                                    )
+
+                                    AppDestination.AI_STUDIO -> AiWorkspaceScreen(
                                         aiState = aiState,
                                         onApproveProposedItem = { draft ->
                                             val added = TrackerItem(
@@ -216,23 +274,9 @@ class MainActivity : ComponentActivity() {
                                                 category = draft.category,
                                                 notes = draft.reason
                                             )
-                                            val next = habitsState.copy(items = listOf(added) + habitsState.items)
-                                            habitsState = next
-                                            habitStorage.save(next)
-                                            HabitLairWidgetProvider.refreshAll(applicationContext)
+                                            persistHabits(habitsState.copy(items = listOf(added) + habitsState.items))
                                         },
-                                        onOpenSettings = { currentTab = AppTab.SETTINGS },
-                                        onOpenDrawer = { scope.launch { drawerState.open() } }
-                                    )
-
-                                    AppTab.SETTINGS -> AppSettingsScreen(
-                                        aiState = aiState,
-                                        backupManager = backupManager,
-                                        onSaveAiState = { updated ->
-                                            aiState = updated
-                                            aiStorage.save(updated)
-                                        },
-                                        onBackupRestored = { reloadAllFromStorage() },
+                                        onOpenSettings = { destination = AppDestination.SETTINGS },
                                         onOpenDrawer = { scope.launch { drawerState.open() } }
                                     )
                                 }

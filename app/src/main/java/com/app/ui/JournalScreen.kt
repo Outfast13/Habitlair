@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +38,7 @@ fun JournalScreen(
     initialState: JournalState,
     storage: JournalStorage,
     onOpenDrawer: () -> Unit,
+    onOpenSettings: () -> Unit,
     onStateChanged: (JournalState) -> Unit
 ) {
     val context = LocalContext.current
@@ -68,7 +71,8 @@ fun JournalScreen(
             sectionTitle = "JOURNAL",
             sectionSubtitle = "Photo, audio & video entries with moods",
             badgeText = "${state.entries.size} entries",
-            onOpenDrawer = onOpenDrawer
+            onOpenDrawer = onOpenDrawer,
+            onOpenSettings = onOpenSettings
         )
 
         if (settings.showDateWheel) {
@@ -228,7 +232,7 @@ fun JournalScreen(
                             .background(LairPalette.SurfaceElevated, RoundedCornerShape(8.dp))
                             .padding(horizontal = 9.dp, vertical = 6.dp)
                     ) {
-                        Text("✕", color = LairPalette.DangerRed, fontWeight = FontWeight.Bold)
+                        Icon(imageVector = Icons.Outlined.Close, contentDescription = "Delete entry", tint = LairPalette.DangerRed, modifier = Modifier.size(16.dp))
                     }
                 }
                 if (entry.body.isNotBlank()) {

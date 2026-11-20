@@ -1,9 +1,9 @@
 package com.app.ui
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,11 +12,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.PhoneAndroid
@@ -37,7 +40,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.app.ai.AiProviderPreset
@@ -58,6 +60,17 @@ import java.net.URL
 import java.time.LocalDate
 import java.util.UUID
 
+private data class QuickCoachPreset(
+    val chipLabel: String,
+    val title: String,
+    val type: TrackerItemType,
+    val category: String,
+    val time: String,
+    val evalMode: String,
+    val reason: String,
+    val prompt: String
+)
+
 @Composable
 fun AiWorkspaceScreen(
     aiState: AiSettingsState,
@@ -67,7 +80,6 @@ fun AiWorkspaceScreen(
     onOpenSettings: () -> Unit,
     onOpenDrawer: () -> Unit
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val primary = MaterialTheme.colorScheme.primary
     val onPrimary = MaterialTheme.colorScheme.onPrimary
@@ -78,6 +90,51 @@ fun AiWorkspaceScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var proposals by remember { mutableStateOf<List<ProposedTrackerItem>>(emptyList()) }
+
+    val quickChips = remember {
+        listOf(
+            QuickCoachPreset(
+                chipLabel = "Audit Now",
+                title = "15m Priority Block",
+                type = TrackerItemType.TASK,
+                category = "Focus",
+                time = "18:30",
+                evalMode = "TIMER",
+                reason = "Instant deep-focus sprint on open items.",
+                prompt = "Audit my bad habits, missed items, and screen time overuse right now."
+            ),
+            QuickCoachPreset(
+                chipLabel = "Cut Screen Time",
+                title = "Phone-Free Reset (20m)",
+                type = TrackerItemType.REMINDER,
+                category = "Screen Guard",
+                time = "21:00",
+                evalMode = "TIMER",
+                reason = "Breaks high screen-time loops before night.",
+                prompt = "Create an anti-overuse screen reset routine for today."
+            ),
+            QuickCoachPreset(
+                chipLabel = "Streak Rescue",
+                title = "Minimum Viable Habit Check",
+                type = TrackerItemType.HABIT,
+                category = "Consistency",
+                time = "19:30",
+                evalMode = "YES_NO",
+                reason = "Keeps momentum alive with a low-friction win.",
+                prompt = "Rescue my zero-streak or lagging habits with a low-friction habit."
+            ),
+            QuickCoachPreset(
+                chipLabel = "Focus Sprint",
+                title = "Pomodoro Deep Block",
+                type = TrackerItemType.TASK,
+                category = "Study",
+                time = "20:00",
+                evalMode = "TIMER",
+                reason = "Focused study/work block without distractions.",
+                prompt = "Build a high-focus task block for my pending workload."
+            )
+        )
+    }
 
     val today = remember { LocalDate.now() }
     val todayEpoch = today.toEpochDay()
@@ -94,34 +151,47 @@ fun AiWorkspaceScreen(
         screenTimeSnapshot.hasUsagePermission &&
         screenTimeSnapshot.todayMinutes >= aiState.dailyScreenLimitMinutes
 
-    fun buildLocalCoachFallback(customGoal: String): Pair<String, List<ProposedTrackerItem>> {
+    fun buildInstantDiagnostics(customGoal: String, presetAction: QuickCoachPreset? = null): Pair<String, List<ProposedTrackerItem>> {
         val alerts = buildList {
             if (overScreenLimit) {
-                add("Screen overuse alert: ${screenTimeSnapshot.todayMinutes}m used today vs ${aiState.dailyScreenLimitMinutes}m limit (top: ${screenTimeSnapshot.topAppName}). Put the phone away and knock out one high-value habit.")
+                add("Screen overuse: ${screenTimeSnapshot.todayMinutes}m / ${aiState.dailyScreenLimitMinutes}m (${screenTimeSnapshot.topAppName}).")
             }
             if (missedOrPendingToday.isNotEmpty()) {
-                add("Pending today (${missedOrPendingToday.size}): ${missedOrPendingToday.take(3).joinToString { it.title }}. Break large blocks into 15-minute starts.")
+                add("Open today (${missedOrPendingToday.size}): ${missedOrPendingToday.take(3).joinToString { it.title }}.")
             }
-            val zeroStreakHabits = habitState.items.filter { it.type == TrackerItemType.HABIT && it.streak == 0 }
-            if (zeroStreakHabits.isNotEmpty()) {
-                add("Habit friction detected on: ${zeroStreakHabits.take(2).joinToString { it.title }}. Pair it with an existing reminder or lower the minimum target.")
+            val zeroStreak = habitState.items.filter { it.type == TrackerItemType.HABIT && it.streak == 0 }
+            if (zeroStreak.isNotEmpty()) {
+                add("Zero streak: ${zeroStreak.take(2).joinToString { it.title }}.")
             }
         }
         val summary = if (alerts.isEmpty()) {
-            "Routine looks steady. Give AI a goal or missed item below to build tailored habits, tasks, or reminders."
+            "All clear. Tap a quick action below or drop a 1-line goal."
         } else {
             alerts.joinToString("\n• ", prefix = "• ")
         }
 
-        val generatedProposals = buildList {
+        val items = buildList {
+            if (presetAction != null) {
+                add(
+                    ProposedTrackerItem(
+                        id = UUID.randomUUID().toString(),
+                        title = presetAction.title,
+                        type = presetAction.type,
+                        category = presetAction.category,
+                        reason = presetAction.reason,
+                        scheduledTime = presetAction.time,
+                        evaluationMode = presetAction.evalMode
+                    )
+                )
+            }
             if (customGoal.isNotBlank()) {
                 add(
                     ProposedTrackerItem(
                         id = UUID.randomUUID().toString(),
                         title = customGoal.trim().take(48),
                         type = TrackerItemType.TASK,
-                        category = "AI Plan",
-                        reason = "Created directly from your custom request.",
+                        category = "Quick Plan",
+                        reason = "Generated from your command.",
                         scheduledTime = "19:00",
                         evaluationMode = "YES_NO"
                     )
@@ -131,126 +201,101 @@ fun AiWorkspaceScreen(
                 add(
                     ProposedTrackerItem(
                         id = UUID.randomUUID().toString(),
-                        title = "Screen-Free Reset Block (20m)",
+                        title = "Screen-Free Reset (20m)",
                         type = TrackerItemType.REMINDER,
-                        category = "Break",
-                        reason = "Triggered because screen usage hit ${screenTimeSnapshot.todayMinutes}m.",
+                        category = "Screen Guard",
+                        reason = "Screen usage at ${screenTimeSnapshot.todayMinutes}m.",
                         scheduledTime = "21:00",
                         evaluationMode = "TIMER"
                     )
                 )
             }
         }
-        return summary to generatedProposals
+        return summary to items
     }
 
-    fun runAiCoach(customGoal: String) {
+    fun triggerCoach(customGoal: String, presetAction: QuickCoachPreset? = null) {
+        val (instantSummary, instantProposals) = buildInstantDiagnostics(customGoal, presetAction)
+        coachSummary = instantSummary
+        proposals = instantProposals
+        errorMessage = null
+
         val keys = aiState.allActiveKeys()
         val preset = AiProviderPreset.fromProviderNameOrId(aiState.providerId.ifBlank { aiState.providerName })
         val needsKey = preset != AiProviderPreset.OLLAMA && preset != AiProviderPreset.LM_STUDIO
 
         if (needsKey && keys.isEmpty()) {
-            val (fallbackMsg, fallbackProps) = buildLocalCoachFallback(customGoal)
-            coachSummary = fallbackMsg
-            proposals = fallbackProps
-            errorMessage = "Add an API key in Settings for full live AI generation (showing local diagnostics)."
             return
         }
 
         isLoading = true
-        errorMessage = null
-
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                val contextSnapshot = buildString {
-                    appendLine("Goal/Prompt: ${customGoal.ifBlank { "Audit my current habits, missed items, bad habit friction, and screen time." }}")
-                    appendLine("Screen Time Today: ${screenTimeSnapshot.todayMinutes}m (Limit: ${aiState.dailyScreenLimitMinutes}m, Top app: ${screenTimeSnapshot.topAppName})")
-                    appendLine("Pending/Missed Today: ${missedOrPendingToday.joinToString { "${it.title} [${it.type.name}]" }.ifBlank { "None" }}")
-                    append("All Items: ${habitState.items.joinToString { "${it.title} (${it.type.name}, streak=${it.streak}d, time=${it.schedule.scheduledTime})" }.ifBlank { "None" }}")
-                }
+                val goalLine = customGoal.ifBlank { presetAction?.prompt ?: "Audit habits, pending items, and screen time." }
+                val contextSnapshot = "Goal: $goalLine | Screen: ${screenTimeSnapshot.todayMinutes}m/${aiState.dailyScreenLimitMinutes}m (${screenTimeSnapshot.topAppName}) | Pending: ${missedOrPendingToday.take(5).joinToString { it.title }.ifBlank { "None" }}"
+                val systemPrompt = "Direct routine coach. Reply ONLY JSON: {"coach_note":"short blunt note","proposals":[{"title":"...","type":"HABIT|TASK|REMINDER","category":"...","scheduled_time":"HH:mm","evaluation_mode":"YES_NO|NUMERIC|TIMER|CHECKLIST","reason":"..."}]}"
 
-                val systemPrompt = "You are HabitLair's strict, direct AI routine & habit coach. Call out bad habit friction, missed items, or excessive screen time plainly without fluff, and propose actionable habits, tasks, or reminders when helpful. Respond ONLY with valid JSON: {\"coach_note\":\"...\",\"proposals\":[{\"title\":\"...\",\"type\":\"HABIT|TASK|REMINDER\",\"category\":\"...\",\"scheduled_time\":\"HH:mm\",\"evaluation_mode\":\"YES_NO|NUMERIC|TIMER|CHECKLIST\",\"reason\":\"...\"}]}"
-
-                val keyCandidates = if (needsKey) {
-                    if (aiState.enableFailover) keys else listOf(keys.first())
+                val activeKey = if (needsKey) keys.first() else ""
+                val call = executeAiChatCompletion(
+                    preset = preset,
+                    endpoint = aiState.endpointUrl,
+                    apiKey = activeKey,
+                    model = aiState.modelId,
+                    systemPrompt = systemPrompt,
+                    userPrompt = contextSnapshot
+                )
+                if (call.isSuccess) {
+                    Result.success(call.getOrThrow())
+                } else if (aiState.enableFailover && aiState.fallbackModelId.isNotBlank() && aiState.fallbackModelId != aiState.modelId) {
+                    executeAiChatCompletion(
+                        preset = preset,
+                        endpoint = aiState.endpointUrl,
+                        apiKey = activeKey,
+                        model = aiState.fallbackModelId,
+                        systemPrompt = systemPrompt,
+                        userPrompt = contextSnapshot
+                    )
                 } else {
-                    listOf("")
+                    call
                 }
-                val modelCandidates = if (aiState.enableFailover && aiState.fallbackModelId.isNotBlank() && aiState.fallbackModelId != aiState.modelId) {
-                    listOf(aiState.modelId, aiState.fallbackModelId)
-                } else {
-                    listOf(aiState.modelId)
-                }
-
-                var lastErr = "AI request failed"
-                for (k in keyCandidates) {
-                    for (m in modelCandidates) {
-                        val call = executeAiChatCompletion(
-                            preset = preset,
-                            endpoint = aiState.endpointUrl,
-                            apiKey = k,
-                            model = m,
-                            systemPrompt = systemPrompt,
-                            userPrompt = contextSnapshot
-                        )
-                        if (call.isSuccess) {
-                            return@withContext Result.success(call.getOrThrow())
-                        } else {
-                            lastErr = call.exceptionOrNull()?.message ?: lastErr
-                        }
-                    }
-                }
-                Result.failure(IllegalStateException(lastErr))
             }
 
             isLoading = false
-            result.fold(
-                onSuccess = { rawContent ->
-                    val cleanedJson = extractJsonObject(rawContent)
-                    val parsed = runCatching {
-                        val obj = JSONObject(cleanedJson)
-                        val note = obj.optString("coach_note", rawContent.trim())
-                        val arr = obj.optJSONArray("proposals") ?: JSONArray()
-                        val list = buildList {
-                            for (i in 0 until arr.length()) {
-                                val p = arr.optJSONObject(i) ?: continue
-                                val pTitle = p.optString("title", "").trim()
-                                if (pTitle.isEmpty()) continue
-                                val pType = runCatching {
-                                    TrackerItemType.valueOf(p.optString("type", "HABIT").uppercase())
-                                }.getOrDefault(TrackerItemType.HABIT)
-                                add(
-                                    ProposedTrackerItem(
-                                        id = UUID.randomUUID().toString(),
-                                        title = pTitle,
-                                        type = pType,
-                                        category = p.optString("category", "AI Coach").ifBlank { "AI Coach" },
-                                        reason = p.optString("reason", "Suggested by AI Coach"),
-                                        scheduledTime = p.optString("scheduled_time", "18:00").ifBlank { "18:00" },
-                                        evaluationMode = p.optString("evaluation_mode", "YES_NO")
-                                    )
+            result.onSuccess { rawContent ->
+                val cleanedJson = extractJsonObject(rawContent)
+                runCatching {
+                    val obj = JSONObject(cleanedJson)
+                    val note = obj.optString("coach_note", "").trim()
+                    if (note.isNotEmpty()) coachSummary = note
+                    val arr = obj.optJSONArray("proposals") ?: JSONArray()
+                    val parsed = buildList {
+                        for (i in 0 until arr.length()) {
+                            val p = arr.optJSONObject(i) ?: continue
+                            val pTitle = p.optString("title", "").trim()
+                            if (pTitle.isEmpty()) continue
+                            val pType = runCatching {
+                                TrackerItemType.valueOf(p.optString("type", "HABIT").uppercase())
+                            }.getOrDefault(TrackerItemType.HABIT)
+                            add(
+                                ProposedTrackerItem(
+                                    id = UUID.randomUUID().toString(),
+                                    title = pTitle,
+                                    type = pType,
+                                    category = p.optString("category", "AI Coach").ifBlank { "AI Coach" },
+                                    reason = p.optString("reason", "AI suggestion"),
+                                    scheduledTime = p.optString("scheduled_time", "18:00").ifBlank { "18:00" },
+                                    evaluationMode = p.optString("evaluation_mode", "YES_NO")
                                 )
-                            }
+                            )
                         }
-                        note to list
                     }
-                    parsed.fold(
-                        onSuccess = { (note, list) ->
-                            coachSummary = note
-                            proposals = list
-                        },
-                        onFailure = {
-                            coachSummary = rawContent.trim()
-                        }
-                    )
-                },
-                onFailure = { err ->
-                    val (fallbackMsg, fallbackProps) = buildLocalCoachFallback(customGoal)
-                    coachSummary = fallbackMsg
-                    proposals = fallbackProps
-                    errorMessage = err.message
+                    if (parsed.isNotEmpty()) {
+                        proposals = parsed + instantProposals
+                    }
                 }
-            )
+            }.onFailure { err ->
+                errorMessage = err.message
+            }
         }
     }
 
@@ -260,7 +305,7 @@ fun AiWorkspaceScreen(
             .background(LairPalette.Canvas)
             .verticalScroll(rememberScrollState())
             .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         HabitLairTopBar(
             sectionTitle = "AI Coach",
@@ -275,14 +320,14 @@ fun AiWorkspaceScreen(
                 .fillMaxWidth()
                 .background(
                     if (overScreenLimit) LairPalette.DangerRed.copy(alpha = 0.16f) else LairPalette.SurfaceCard,
-                    RoundedCornerShape(14.dp)
+                    RoundedCornerShape(12.dp)
                 )
                 .border(
                     1.dp,
                     if (overScreenLimit) LairPalette.DangerRed else LairPalette.BorderSubtle,
-                    RoundedCornerShape(14.dp)
+                    RoundedCornerShape(12.dp)
                 )
-                .padding(12.dp),
+                .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -290,49 +335,67 @@ fun AiWorkspaceScreen(
                 imageVector = if (overScreenLimit) Icons.Outlined.WarningAmber else Icons.Outlined.PhoneAndroid,
                 contentDescription = null,
                 tint = if (overScreenLimit) LairPalette.DangerRed else secondary,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(20.dp)
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = if (!screenTimeSnapshot.hasUsagePermission) {
-                        "Screen Guard: Grant Usage Access in Settings to track screen overuse"
-                    } else if (overScreenLimit) {
-                        "Overuse Warning: ${screenTimeSnapshot.todayMinutes}m / ${aiState.dailyScreenLimitMinutes}m limit (${screenTimeSnapshot.topAppName})"
+                        "Usage Access off • ${missedOrPendingToday.size} open today"
                     } else {
-                        "Screen Time Today: ${screenTimeSnapshot.todayMinutes}m / ${aiState.dailyScreenLimitMinutes}m limit"
+                        "Screen ${screenTimeSnapshot.todayMinutes}m / ${aiState.dailyScreenLimitMinutes}m • ${missedOrPendingToday.size} open"
                     },
                     color = LairPalette.TextPrimary,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold
                 )
-                Text(
-                    text = "${missedOrPendingToday.size} scheduled items still open today",
-                    color = LairPalette.TextSecondary,
-                    style = MaterialTheme.typography.bodySmall
-                )
             }
         }
 
+        // One-tap quick actions (zero typing needed)
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Icons.Outlined.Bolt, contentDescription = null, tint = primary, modifier = Modifier.size(16.dp))
+                Text("One-Tap Actions", color = LairPalette.TextSecondary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(quickChips, key = { it.chipLabel }) { chip ->
+                    Box(
+                        modifier = Modifier
+                            .pressScale { triggerCoach(promptText, chip) }
+                            .background(LairPalette.SurfaceElevated, RoundedCornerShape(10.dp))
+                            .border(1.dp, primary.copy(alpha = 0.45f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = chip.chipLabel,
+                            color = LairPalette.TextPrimary,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        // Optional quick input box
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(LairPalette.SurfaceCard, RoundedCornerShape(14.dp))
-                .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(14.dp))
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .background(LairPalette.SurfaceCard, RoundedCornerShape(12.dp))
+                .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(12.dp))
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = primary, modifier = Modifier.size(18.dp))
-                Text("Direct Routine & Habit Command", color = LairPalette.TextPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = primary, modifier = Modifier.size(16.dp))
+                Text("Quick Goal / Override", color = LairPalette.TextPrimary, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             }
 
             OutlinedTextField(
                 value = promptText,
                 onValueChange = { promptText = it },
-                label = { Text("What do you want to fix, build, or get called out on?") },
-                placeholder = { Text("e.g., Fix my missed evening study, cut phone overuse, set a calisthenics reminder") },
-                minLines = 2,
-                maxLines = 4,
+                placeholder = { Text("Optional: quick task or goal...") },
+                singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = primary,
                     unfocusedBorderColor = LairPalette.BorderSubtle,
@@ -342,53 +405,44 @@ fun AiWorkspaceScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = { runAiCoach("Audit my bad habits, missed items, and screen time overuse right now.") },
-                    enabled = !isLoading,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Audit Now", color = LairPalette.TextPrimary)
-                }
-                Button(
-                    onClick = { runAiCoach(promptText) },
-                    enabled = !isLoading,
-                    colors = ButtonDefaults.buttonColors(containerColor = primary, contentColor = onPrimary),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(if (isLoading) "Running..." else "Run AI Coach")
-                }
+            Button(
+                onClick = { triggerCoach(promptText, null) },
+                enabled = !isLoading,
+                colors = ButtonDefaults.buttonColors(containerColor = primary, contentColor = onPrimary),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (isLoading) "Syncing..." else "Run Now", fontWeight = FontWeight.Bold)
             }
         }
 
         errorMessage?.let { err ->
-            Text(err, color = LairPalette.AccentAmber, style = MaterialTheme.typography.bodySmall)
+            Text(err, color = LairPalette.AccentAmber, style = MaterialTheme.typography.labelSmall)
         }
 
         coachSummary?.let { note ->
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(LairPalette.SurfaceCard, RoundedCornerShape(14.dp))
-                    .border(1.dp, primary.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                    .background(LairPalette.SurfaceCard, RoundedCornerShape(12.dp))
+                    .border(1.dp, primary.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("AI Assessment", color = primary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                Text("Assessment", color = primary, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                 Text(note, color = LairPalette.TextPrimary, style = MaterialTheme.typography.bodyMedium)
             }
         }
 
         if (proposals.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Proposed Habits, Tasks & Reminders", color = LairPalette.TextPrimary, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text("Quick Add Items", color = LairPalette.TextPrimary, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 proposals.forEach { draft ->
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(LairPalette.SurfaceCard, RoundedCornerShape(12.dp))
                             .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(12.dp))
-                            .padding(12.dp),
+                            .padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Row(
@@ -396,7 +450,7 @@ fun AiWorkspaceScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(draft.title, color = LairPalette.TextPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            Text(draft.title, color = LairPalette.TextPrimary, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                             Text("${draft.type.name} • ${format24hToAmPm(draft.scheduledTime)}", color = secondary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                         }
                         Text(draft.reason, color = LairPalette.TextSecondary, style = MaterialTheme.typography.bodySmall)
@@ -405,20 +459,19 @@ fun AiWorkspaceScreen(
                                 onClick = {
                                     onApproveProposedItem(draft)
                                     proposals = proposals.filterNot { it.id == draft.id }
-                                    Toast.makeText(context, "Added \"${draft.title}\"", Toast.LENGTH_SHORT).show()
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = primary, contentColor = onPrimary),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Text("  Approve", fontWeight = FontWeight.Bold)
+                                Text("  Add", fontWeight = FontWeight.Bold)
                             }
                             OutlinedButton(
                                 onClick = { proposals = proposals.filterNot { it.id == draft.id } },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Icon(Icons.Outlined.Close, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Text("  Dismiss", color = LairPalette.TextSecondary)
+                                Text("  Skip", color = LairPalette.TextSecondary)
                             }
                         }
                     }
@@ -452,8 +505,8 @@ private fun executeAiChatCompletion(
     val targetUrl = endpoint.trim().ifBlank { preset.defaultEndpoint }
     val conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
         requestMethod = "POST"
-        connectTimeout = 20_000
-        readTimeout = 30_000
+        connectTimeout = 8_000
+        readTimeout = 12_000
         doOutput = true
         setRequestProperty("Content-Type", "application/json")
         if (apiKey.isNotBlank()) {
@@ -469,7 +522,7 @@ private fun executeAiChatCompletion(
     val payload = if (preset == AiProviderPreset.ANTHROPIC) {
         JSONObject().apply {
             put("model", model)
-            put("max_tokens", 1024)
+            put("max_tokens", 512)
             put("system", systemPrompt)
             put(
                 "messages",
@@ -484,7 +537,7 @@ private fun executeAiChatCompletion(
     } else {
         JSONObject().apply {
             put("model", model)
-            put("temperature", 0.3)
+            put("temperature", 0.2)
             put(
                 "messages",
                 JSONArray()
@@ -511,7 +564,7 @@ private fun executeAiChatCompletion(
     conn.disconnect()
 
     if (code !in 200..299) {
-        throw IllegalStateException("HTTP $code: ${bodyText.take(180)}")
+        throw IllegalStateException("HTTP $code: ${bodyText.take(140)}")
     }
 
     val respObj = JSONObject(bodyText)

@@ -50,6 +50,61 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/habitlair_widget_info" />
         </receiver>
+        <receiver
+            android:name=".widget.HabitPulseWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/habitlair_widget_habits_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.TaskQueueWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/habitlair_widget_tasks_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.StreakVaultWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/habitlair_widget_streak_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.PomodoroPulseWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/habitlair_widget_pomodoro_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.ScreenGuardWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/habitlair_widget_screentime_info" />
+        </receiver>
+
 
         <provider
             android:name="androidx.core.content.FileProvider"

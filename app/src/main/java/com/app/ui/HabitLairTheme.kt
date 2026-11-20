@@ -69,7 +69,7 @@ object LairPalette {
 fun Modifier.pressScale(onClick: () -> Unit): Modifier = composed {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(targetValue = if (pressed) 0.96f else 1f, label = "pressScale")
+    val scale = if (pressed) 0.97f else 1f
     this
         .scale(scale)
         .clickable(
@@ -199,38 +199,104 @@ fun TinyDateWheelBar(
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val onPrimary = MaterialTheme.colorScheme.onPrimary
+    val today = remember { LocalDate.now() }
     val days = remember(selectedDate) {
-        (-3..3).map { offset -> selectedDate.plusDays(offset.toLong()) }
+        (-7..7).map { offset -> selectedDate.plusDays(offset.toLong()) }
     }
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    val monthLabel = remember(selectedDate) {
+        selectedDate.format(DateTimeFormatter.ofPattern("MMM yyyy", Locale.US))
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(LairPalette.SurfaceCard, RoundedCornerShape(12.dp))
+            .border(1.dp, LairPalette.BorderSubtle, RoundedCornerShape(12.dp))
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        items(days, key = { it.toEpochDay() }) { d ->
-            val isSelected = d == selectedDate
-            Column(
-                modifier = Modifier
-                    .pressScale { onSelectDate(d) }
-                    .background(if (isSelected) primary else LairPalette.SurfaceCard, RoundedCornerShape(10.dp))
-                    .border(
-                        1.dp,
-                        if (isSelected) primary else LairPalette.BorderSubtle,
-                        RoundedCornerShape(10.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = monthLabel,
+                color = LairPalette.TextPrimary,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .pressScale { onSelectDate(selectedDate.minusDays(1)) }
+                        .background(LairPalette.SurfaceElevated, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text("<", color = LairPalette.TextPrimary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                }
+                Box(
+                    modifier = Modifier
+                        .pressScale { onSelectDate(today) }
+                        .background(
+                            if (selectedDate == today) primary.copy(alpha = 0.2f) else LairPalette.SurfaceElevated,
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = if (selectedDate == today) "Today" else "Jump Today",
+                        color = if (selectedDate == today) primary else LairPalette.TextPrimary,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold
                     )
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = d.dayOfWeek.name.take(3),
-                    color = if (isSelected) onPrimary else LairPalette.TextSecondary,
-                    style = MaterialTheme.typography.labelSmall
-                )
-                Text(
-                    text = d.dayOfMonth.toString(),
-                    color = if (isSelected) onPrimary else LairPalette.TextPrimary,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
+                }
+                Box(
+                    modifier = Modifier
+                        .pressScale { onSelectDate(selectedDate.plusDays(1)) }
+                        .background(LairPalette.SurfaceElevated, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(">", color = LairPalette.TextPrimary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            items(days, key = { it.toEpochDay() }) { d ->
+                val isSelected = d == selectedDate
+                val isToday = d == today
+                Column(
+                    modifier = Modifier
+                        .pressScale { onSelectDate(d) }
+                        .background(if (isSelected) primary else LairPalette.SurfaceElevated, RoundedCornerShape(10.dp))
+                        .border(
+                            1.dp,
+                            when {
+                                isSelected -> primary
+                                isToday -> MaterialTheme.colorScheme.secondary
+                                else -> LairPalette.BorderSubtle
+                            },
+                            RoundedCornerShape(10.dp)
+                        )
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = d.dayOfWeek.name.take(3),
+                        color = if (isSelected) onPrimary else LairPalette.TextSecondary,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                    Text(
+                        text = d.dayOfMonth.toString(),
+                        color = if (isSelected) onPrimary else LairPalette.TextPrimary,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }

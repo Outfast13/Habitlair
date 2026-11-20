@@ -101,7 +101,13 @@ class MainActivity : ComponentActivity() {
             var journalState by remember { mutableStateOf(journalStorage.load()) }
             var pomodoroState by remember { mutableStateOf(pomodoroStorage.load()) }
             var screenSnapshot by remember {
-                mutableStateOf(ScreenTimeSnapshot(hasUsagePermission = false, todayMinutes = 0, topAppName = "Checking"))
+                mutableStateOf(
+                    ScreenTimeSnapshot(
+                        hasUsagePermission = false,
+                        todayMinutes = 0,
+                        topAppName = "Checking"
+                    )
+                )
             }
 
             LaunchedEffect(Unit) {

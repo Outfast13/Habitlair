@@ -164,12 +164,9 @@ fun AiWorkspaceScreen(
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 val contextSnapshot = buildString {
-                    append("Goal/Prompt: ${customGoal.ifBlank { "Audit my current habits, missed items, bad habit friction, and screen time." }}
-")
-                    append("Screen Time Today: ${screenTimeSnapshot.todayMinutes}m (Limit: ${aiState.dailyScreenLimitMinutes}m, Top app: ${screenTimeSnapshot.topAppName})
-")
-                    append("Pending/Missed Today: ${missedOrPendingToday.joinToString { "${it.title} [${it.type.name}]" }.ifBlank { "None" }}
-")
+                    appendLine("Goal/Prompt: ${customGoal.ifBlank { "Audit my current habits, missed items, bad habit friction, and screen time." }}")
+                    appendLine("Screen Time Today: ${screenTimeSnapshot.todayMinutes}m (Limit: ${aiState.dailyScreenLimitMinutes}m, Top app: ${screenTimeSnapshot.topAppName})")
+                    appendLine("Pending/Missed Today: ${missedOrPendingToday.joinToString { "${it.title} [${it.type.name}]" }.ifBlank { "None" }}")
                     append("All Items: ${habitState.items.joinToString { "${it.title} (${it.type.name}, streak=${it.streak}d, time=${it.schedule.scheduledTime})" }.ifBlank { "None" }}")
                 }
 

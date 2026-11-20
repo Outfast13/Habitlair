@@ -245,11 +245,11 @@ fun JournalScreen(
                     )
                     MediaPickerActionRow(
                         targetDir = storage.getMediaDirectory(),
-                        onMediaAdded = { att -> attachments = attachments + att }
+                        onMediaAdded = { att: MediaAttachment -> attachments = attachments + att }
                     )
                     AttachmentPreviewStrip(
                         attachments = attachments,
-                        onRemove = { rem -> attachments = attachments.filterNot { it.id == rem.id } }
+                        onRemove = { rem: MediaAttachment -> attachments = attachments.filterNot { it.id == rem.id } }
                     )
                 }
             },

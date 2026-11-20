@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.HabitLair" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#0A0E0C</item>
+        <item name="android:navigationBarColor">#131A16</item>
+    </style>
+</resources>

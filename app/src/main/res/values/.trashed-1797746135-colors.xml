@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="habitlair_bg">#0A0E0C</color>
+    <color name="habitlair_card">#131A16</color>
+    <color name="habitlair_mint">#6EE7B7</color>
+    <color name="habitlair_amber">#FBBF24</color>
+</resources>

@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <files-path name="journal_media" path="journal_media/" />
-    <files-path name="tracker_media" path="tracker_media/" />
-    <cache-path name="backups" path="backups/" />
+    <files-path name="media" path="media/" />
 </paths>

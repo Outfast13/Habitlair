@@ -1,10 +1,23 @@
-# HabitLair v4
+# HabitLair
 
-Complete local-first Android habit, task, reminder, journal, and Pomodoro workspace:
-- Full **Settings** (AI provider & failover, Material You + presets + custom hex accents, date wheel toggle, notifications & alarms with test triggers, JSON backup export/import & periodic local snapshots)
-- **Habits**, **Tasks**, and **Reminders** with daily, weekly, specific days of week, alternate days, and custom N-day/week/month/year schedules
-- **Timed completion logging** with editable completion time, optional notes, and optional proof photos
-- **Photo, audio, and video attachments** across habits, tasks, reminders, and journal entries
-- **Tiny Date Wheel** strip for inspecting and filtering schedules by date
-- **Home screen widget** (`HabitLairWidgetProvider`) showing today's completion count and streak
-- **Top-left sidebar (`☰`)** showing streaks, totals, and completion/logging history
+Native Android habit, task, journal and Pomodoro app with a bring-your-own-key AI coach.
+Kotlin · Jetpack Compose · Material 3 (Material You) · MVVM · Room · DataStore · WorkManager/AlarmManager · Glance widget.
+
+## Build
+1. Open this folder in Android Studio (Ladybug or newer, JDK 17). It generates the Gradle wrapper and syncs.
+2. Run the `app` configuration on a device/emulator (API 26+).
+   Or from a terminal with Gradle 8.9+: `gradle :app:assembleDebug`.
+
+## Layout
+- `data/`   Room entities and DAOs, DataStore settings, encrypted API-key store, repository, backup/restore, streaks
+- `ai/`     HTTP client (Gemini, OpenAI, OpenRouter, custom), tolerant JSON parser, offline generator, AI service
+- `work/`   AlarmManager scheduler, notification channels, receivers (reminder, action, boot), WorkManager maintenance worker
+- `widget/` Glance home-screen widget with tap-to-check
+- `timer/`  Pomodoro engine (app-scoped)
+- `ui/`     Compose screens, editors, view models, theme
+
+## Notes
+- API keys live only in EncryptedSharedPreferences and are never part of backups.
+- Backups include habits, history, tasks, journal, Pomodoro data and settings, but not media files.
+- Exact alarms need the "Alarms & reminders" permission on Android 12+ (Settings has a shortcut); otherwise reminders fire inexactly.
+- Cleartext HTTP is enabled so a custom endpoint such as a LAN Ollama server works.

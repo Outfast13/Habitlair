@@ -1,6 +1,7 @@
 package com.habitlair.app.widget
 
 import android.content.Context
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -8,14 +9,12 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.action.ActionParameters
-import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.LinearProgressIndicator
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
-import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
@@ -43,14 +42,15 @@ class HabitWidget : GlanceAppWidget() {
             .filter { !it.archived && it.isScheduled(day) }
             .sortedBy { it.timeMinutes ?: Int.MAX_VALUE }
         val done = c.db.habits().doneIds(day).toSet()
-        provideContent { GlanceTheme { WidgetContent(habits, done) } }
+        provideContent { GlanceTheme { WidgetContent(context, habits, done) } }
     }
 }
 
 @Composable
-private fun WidgetContent(habits: List<Habit>, done: Set<Long>) {
+private fun WidgetContent(context: Context, habits: List<Habit>, done: Set<Long>) {
     val total = habits.size
     val n = habits.count { it.id in done }
+    val launchIntent = Intent(context, MainActivity::class.java)
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -60,7 +60,7 @@ private fun WidgetContent(habits: List<Habit>, done: Set<Long>) {
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
-                .clickable(actionStartActivity<MainActivity>()),
+                .clickable(actionStartActivity(launchIntent)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -83,9 +83,7 @@ private fun WidgetContent(habits: List<Habit>, done: Set<Long>) {
         Spacer(GlanceModifier.height(6.dp))
         LinearProgressIndicator(
             progress = if (total == 0) 0f else n.toFloat() / total,
-            modifier = GlanceModifier.fillMaxWidth(),
-            color = GlanceTheme.colors.primary,
-            backgroundColor = GlanceTheme.colors.secondaryContainer
+            modifier = GlanceModifier.fillMaxWidth()
         )
         Spacer(GlanceModifier.height(6.dp))
         if (habits.isEmpty()) {
@@ -95,29 +93,20 @@ private fun WidgetContent(habits: List<Habit>, done: Set<Long>) {
             )
         } else {
             LazyColumn {
-                items(habits, itemId = { it.id }) { h ->
+                items(habits) { h ->
                     val isDone = h.id in done
                     val mark = if (isDone) "[x] " else "[ ] "
                     val label = mark + (h.timeMinutes?.let { Dates.fmtTime(it) + "  " } ?: "") + h.name
-                    Row(
+                    Text(
+                        text = label,
                         modifier = GlanceModifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .clickable(
-                                actionRunCallback<ToggleHabitAction>(
-                                    actionParametersOf(HabitIdKey to h.id)
-                                )
-                            ),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = label,
-                            style = TextStyle(
-                                color = if (isDone) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.onSurface,
-                                fontSize = 14.sp
-                            )
+                            .padding(vertical = 4.dp),
+                        style = TextStyle(
+                            color = if (isDone) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.onSurface,
+                            fontSize = 14.sp
                         )
-                    }
+                    )
                 }
             }
         }

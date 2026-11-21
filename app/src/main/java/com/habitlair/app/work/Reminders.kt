@@ -74,7 +74,13 @@ object Notifier {
 
     fun showTest(ctx: Context, s: AppSettings): Boolean {
         if (!canPost(ctx)) return false
-        show(ctx, 9_999, "HabitLair test", "Notifications are working${if (s.sound) " (sound on)" else ""}${if (s.vibration) " (vibration on)" else ""}.")
+        show(
+            ctx,
+            s,
+            9_999,
+            "HabitLair test",
+            "Notifications are working${if (s.sound) " (sound on)" else ""}${if (s.vibration) " (vibration on)" else ""}."
+        )
         return true
     }
 }

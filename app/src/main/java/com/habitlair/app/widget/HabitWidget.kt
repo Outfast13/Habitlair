@@ -7,11 +7,9 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
-import androidx.glance.action.Action
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
-import androidx.glance.appwidget.CheckBox
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.LinearProgressIndicator
@@ -98,15 +96,28 @@ private fun WidgetContent(habits: List<Habit>, done: Set<Long>) {
         } else {
             LazyColumn {
                 items(habits, itemId = { it.id }) { h ->
-                    val toggleAction: Action = actionRunCallback<ToggleHabitAction>(
-                        actionParametersOf(HabitIdKey to h.id)
-                    )
-                    CheckBox(
-                        checked = h.id in done,
-                        onCheckedChange = toggleAction,
-                        text = (h.timeMinutes?.let { Dates.fmtTime(it) + "  " } ?: "") + h.name,
-                        style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp)
-                    )
+                    val isDone = h.id in done
+                    val mark = if (isDone) "[x] " else "[ ] "
+                    val label = mark + (h.timeMinutes?.let { Dates.fmtTime(it) + "  " } ?: "") + h.name
+                    Row(
+                        modifier = GlanceModifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clickable(
+                                actionRunCallback<ToggleHabitAction>(
+                                    actionParametersOf(HabitIdKey to h.id)
+                                )
+                            ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = label,
+                            style = TextStyle(
+                                color = if (isDone) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.onSurface,
+                                fontSize = 14.sp
+                            )
+                        )
+                    }
                 }
             }
         }

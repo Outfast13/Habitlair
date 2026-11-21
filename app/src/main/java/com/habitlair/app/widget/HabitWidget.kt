@@ -7,6 +7,7 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.action.Action
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
@@ -40,7 +41,9 @@ class HabitWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val c = (context.applicationContext as HabitLairApp).container
         val day = Dates.today()
-        val habits = c.db.habits().all().filter { !it.archived && it.isScheduled(day) }.sortedBy { it.timeMinutes ?: Int.MAX_VALUE }
+        val habits = c.db.habits().all()
+            .filter { !it.archived && it.isScheduled(day) }
+            .sortedBy { it.timeMinutes ?: Int.MAX_VALUE }
         val done = c.db.habits().doneIds(day).toSet()
         provideContent { GlanceTheme { WidgetContent(habits, done) } }
     }
@@ -50,16 +53,34 @@ class HabitWidget : GlanceAppWidget() {
 private fun WidgetContent(habits: List<Habit>, done: Set<Long>) {
     val total = habits.size
     val n = habits.count { it.id in done }
-    Column(GlanceModifier.fillMaxSize().background(GlanceTheme.colors.widgetBackground).padding(12.dp)) {
+    Column(
+        modifier = GlanceModifier
+            .fillMaxSize()
+            .background(GlanceTheme.colors.widgetBackground)
+            .padding(12.dp)
+    ) {
         Row(
-            GlanceModifier.fillMaxWidth().clickable(actionStartActivity<MainActivity>()),
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .clickable(actionStartActivity<MainActivity>()),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "HabitLair · Today", modifier = GlanceModifier.defaultWeight(),
-                style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 15.sp, color = GlanceTheme.colors.onSurface)
+                text = "HabitLair · Today",
+                modifier = GlanceModifier.defaultWeight(),
+                style = TextStyle(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = GlanceTheme.colors.onSurface
+                )
             )
-            Text("$n/$total", style = TextStyle(fontWeight = FontWeight.Bold, color = GlanceTheme.colors.primary))
+            Text(
+                text = "$n/$total",
+                style = TextStyle(
+                    fontWeight = FontWeight.Bold,
+                    color = GlanceTheme.colors.primary
+                )
+            )
         }
         Spacer(GlanceModifier.height(6.dp))
         LinearProgressIndicator(
@@ -70,13 +91,19 @@ private fun WidgetContent(habits: List<Habit>, done: Set<Long>) {
         )
         Spacer(GlanceModifier.height(6.dp))
         if (habits.isEmpty()) {
-            Text("Nothing scheduled today", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant))
+            Text(
+                text = "Nothing scheduled today",
+                style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant)
+            )
         } else {
             LazyColumn {
                 items(habits, itemId = { it.id }) { h ->
+                    val toggleAction: Action = actionRunCallback<ToggleHabitAction>(
+                        actionParametersOf(HabitIdKey to h.id)
+                    )
                     CheckBox(
                         checked = h.id in done,
-                        onCheckedChange = actionRunCallback<ToggleHabitAction>(actionParametersOf(HabitIdKey to h.id)),
+                        onCheckedChange = toggleAction,
                         text = (h.timeMinutes?.let { Dates.fmtTime(it) + "  " } ?: "") + h.name,
                         style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp)
                     )
